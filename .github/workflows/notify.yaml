@@ -6,7 +6,7 @@ on:
 
 
 
-    - cron: '2-58/2 22 * * *'   # 6:30 UTC to 6:58 UTC every 2 min (= 8:30-8:58 Brussels)   # every 2 min within 21:00 UTC hour
+    - cron: '32-58/2 22 * * *'   # 6:30 UTC to 6:58 UTC every 2 min (= 8:30-8:58 Brussels)   # every 2 min within 21:00 UTC hour
 jobs:
   notify:
     runs-on: ubuntu-latest

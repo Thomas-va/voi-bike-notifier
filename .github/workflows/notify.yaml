@@ -2,10 +2,8 @@ name: Voi bike notifier
 
 on:
   workflow_dispatch:
-  # schedule:
-  #   - cron: '*/2 7-7 * * 1-5'   # every 2 min from 07:00-07:59 UTC, Mon-Fri
-  #                                 # (= 09:00-09:59 Brussels CEST). Uncomment when ready.
-
+  schedule:
+    - cron: '*/2 21 * * *'    # every 2 min within 21:00 UTC hour
 jobs:
   notify:
     runs-on: ubuntu-latest

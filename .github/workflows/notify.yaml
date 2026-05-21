@@ -1,0 +1,31 @@
+name: Voi bike notifier
+
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: '*/2 7-7 * * 1-5'   # every 2 min from 07:00-07:59 UTC, Mon-Fri
+  #                                 # (= 09:00-09:59 Brussels CEST). Uncomment when ready.
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run notifier
+        env:
+          HOME_LAT: ${{ secrets.HOME_LAT }}
+          HOME_LON: ${{ secrets.HOME_LON }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          GIST_ID: ${{ secrets.GIST_ID }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+        run: python bike_notifier.py

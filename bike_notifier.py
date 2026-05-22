@@ -40,7 +40,7 @@ def to_iso(dt):
 
 def from_iso(s):
     return datetime.fromisoformat(s)
-    
+
 def pick_location():
     """Return (lat, lon, label) based on current UTC time, or None if outside any window."""
     now = now_utc()
@@ -57,6 +57,7 @@ def pick_location():
     if weekday in (0, 3, 4) and hour == 13 and 15 <= minute <= 43:
         return WORK_LAT, WORK_LON, "work"
     return None
+
 
 # --- Geometry & URI helpers ---
 def distance_meters(lat1, lon1, lat2, lon2):
@@ -185,11 +186,11 @@ def run():
         return
     lat, lon, label = location
     print(f"Active window: {label}")
-    
+
     state = load_state()
     bikes = fetch_bikes(lat, lon)
     current_best = bikes[0] if bikes else None
-    
+
     # --- Case: new window ---
     if is_new_window(state):
         new_state = {"window_started_at": to_iso(now_utc())}
@@ -203,7 +204,7 @@ def run():
         else:
             send_notification(
                 "⚠️ No bikes nearby",
-                "No Voi bikes available near home right now.\nConsider walking or transit.",
+                f"No Voi bikes available near {label} right now.\nConsider walking or transit.",
             )
             new_state["alerted_bike"] = None
             new_state["reservation_alert_sent"] = False
@@ -273,18 +274,27 @@ def run():
 
     # Alerted bike still available
     if age > timedelta(minutes=HOLD_DURATION_MIN):
-    if current_best is None:
-        # Hold expired and no bikes left to suggest
+        if current_best is None:
+            # Hold expired and no bikes left to suggest
+            send_notification(
+                "⚠️ Hold expired, no bikes",
+                f"Your {alerted['code']} reservation window passed and no other bikes are available.",
+            )
+            state["alerted_bike"] = None
+            state["reservation_alert_sent"] = False
+            save_state(state)
+            print("Hold expired, no bikes available.")
+            return
+        bike_to_alert = current_best
         send_notification(
-            "⚠️ Hold expired, no bikes",
-            f"Your {alerted['code']} reservation window passed and no other bikes are available.",
+            f"🚲 Reserve {bike_to_alert['code']} (hold expired)",
+            bike_message(bike_to_alert) + "\n💡 Re-reserve in app when 10 min away",
+            click_url=bike_to_alert["deep_link"],
         )
-        state["alerted_bike"] = None
-        state["reservation_alert_sent"] = False
+        state = record_alerted(state, bike_to_alert)
         save_state(state)
-        print("Hold expired, no bikes available.")
+        print(f"10 min passed; re-alerted for {bike_to_alert['code']}")
         return
-    bike_to_alert = current_best
 
     # Check for meaningfully closer bike
     if current_best and current_best["code"] != alerted["code"]:

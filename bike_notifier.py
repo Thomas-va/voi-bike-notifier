@@ -9,9 +9,10 @@ from math import radians, sin, cos, asin, sqrt
 from urllib.parse import unquote
 from datetime import datetime, timezone, timedelta
 
-# --- Config ---
 HOME_LAT = float(os.environ["HOME_LAT"])
 HOME_LON = float(os.environ["HOME_LON"])
+WORK_LAT = float(os.environ["WORK_LAT"])
+WORK_LON = float(os.environ["WORK_LON"])
 NTFY_TOPIC = os.environ["NTFY_TOPIC"]
 GIST_ID = os.environ["GIST_ID"]
 GIST_TOKEN = os.environ["GIST_TOKEN"]
@@ -39,7 +40,23 @@ def to_iso(dt):
 
 def from_iso(s):
     return datetime.fromisoformat(s)
+    
+def pick_location():
+    """Return (lat, lon, label) based on current UTC time, or None if outside any window."""
+    now = now_utc()
+    weekday = now.weekday()  # Mon=0 ... Sun=6
+    hour, minute = now.hour, now.minute
 
+    # Monday morning 7:15-7:43 UTC (= 9:15-9:43 Brussels CEST)
+    if weekday == 0 and hour == 7 and 15 <= minute <= 43:
+        return HOME_LAT, HOME_LON, "home"
+    # Thu/Fri morning 6:25-6:53 UTC (= 8:25-8:53 Brussels CEST)
+    if weekday in (3, 4) and hour == 6 and 25 <= minute <= 53:
+        return HOME_LAT, HOME_LON, "home"
+    # Mon/Thu/Fri afternoon 13:15-13:43 UTC (= 15:15-15:43 Brussels CEST)
+    if weekday in (0, 3, 4) and hour == 13 and 15 <= minute <= 43:
+        return WORK_LAT, WORK_LON, "work"
+    return None
 
 # --- Geometry & URI helpers ---
 def distance_meters(lat1, lon1, lat2, lon2):
@@ -77,8 +94,8 @@ def save_state(state):
 
 
 # --- Feed parsing ---
-def fetch_bikes():
-    """Return all available bikes near home, sorted by distance."""
+def fetch_bikes(lat, lon):
+    """Return all available bikes near (lat, lon), sorted by distance."""
     r = requests.get(FEED_URL, timeout=10)
     r.raise_for_status()
     bikes = r.json()["data"]["bikes"]
@@ -93,7 +110,7 @@ def fetch_bikes():
         battery_pct = range_km / MAX_RANGE_KM * 100
         if battery_pct < MIN_BATTERY_PCT:
             continue
-        d = distance_meters(HOME_LAT, HOME_LON, b["lat"], b["lon"])
+        d = distance_meters(lat, lon, b["lat"], b["lon"])
         if d > SEARCH_RADIUS_M:
             continue
         results.append({
@@ -162,10 +179,17 @@ def record_alerted(state, bike):
 
 
 def run():
+    location = pick_location()
+    if location is None:
+        print("Outside any active window — exiting silently.")
+        return
+    lat, lon, label = location
+    print(f"Active window: {label}")
+    
     state = load_state()
-    bikes = fetch_bikes()
+    bikes = fetch_bikes(lat, lon)
     current_best = bikes[0] if bikes else None
-
+    
     # --- Case: new window ---
     if is_new_window(state):
         new_state = {"window_started_at": to_iso(now_utc())}

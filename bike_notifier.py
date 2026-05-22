@@ -273,16 +273,18 @@ def run():
 
     # Alerted bike still available
     if age > timedelta(minutes=HOLD_DURATION_MIN):
-        bike_to_alert = current_best  # may be same as alerted, may be different
+    if current_best is None:
+        # Hold expired and no bikes left to suggest
         send_notification(
-            f"🚲 Reserve {bike_to_alert['code']} (hold expired)",
-            bike_message(bike_to_alert) + "\n💡 Re-reserve in app when 10 min away",
-            click_url=bike_to_alert["deep_link"],
+            "⚠️ Hold expired, no bikes",
+            f"Your {alerted['code']} reservation window passed and no other bikes are available.",
         )
-        state = record_alerted(state, bike_to_alert)
+        state["alerted_bike"] = None
+        state["reservation_alert_sent"] = False
         save_state(state)
-        print(f"10 min passed; re-alerted for {bike_to_alert['code']}")
+        print("Hold expired, no bikes available.")
         return
+    bike_to_alert = current_best
 
     # Check for meaningfully closer bike
     if current_best and current_best["code"] != alerted["code"]:
